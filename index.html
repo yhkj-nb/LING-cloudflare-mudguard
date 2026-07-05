@@ -1,0 +1,385 @@
+
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cloudflare 控制台</title>
+    <!-- Favicon: 统一使用橙色云朵图标 -->
+    <link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22%23f38020%22%3E%3Cpath%20d%3D%22M16.5088%2016.8447c.1475-.5068.0908-.9707-.1553-1.3154-.2246-.3164-.6045-.499-1.0615-.5205l-8.6592-.1123a.1559.1559%200%200%201-.1333-.0713c-.0283-.042-.0351-.0986-.021-.1553.0278-.084.1123-.1484.2036-.1562l8.7359-.1123c1.0351-.0489%202.1601-.8868%202.5537-1.9136l.499-1.3013c.0215-.0561.0293-.1128.0147-.168-.5625-2.5463-2.835-4.4453-5.5499-4.4453-2.5039%200-4.6284%201.6177-5.3876%203.8614-.4927-.3658-1.1187-.5625-1.794-.499-1.2026.119-2.1665%201.083-2.2861%202.2856-.0283.31-.0069.6128.0635.894C1.5683%2013.171%200%2014.7754%200%2016.752c0%20.1748.0142.3515.0352.5273.0141.083.0844.1475.1689.1475h15.9814c.0909%200%20.1758-.0645.2032-.1553l.12-.4268zm2.7568-5.5634c-.0771%200-.1611%200-.2383.0112-.0566%200-.1054.0415-.127.0976l-.3378%201.1744c-.1475.5068-.0918.9707.1543%201.3164.2256.3164.6055.498%201.0625.5195l1.8437.1133c.0557%200%20.1055.0263.1329.0703.0283.043.0351.1074.0214.1562-.0283.084-.1132.1485-.204.1553l-1.921.1123c-1.041.0488-2.1582.8867-2.5527%201.914l-.1406.3585c-.0283.0713.0215.1416.0986.1416h6.5977c.0771%200%20.1474-.0489.169-.126.1122-.4082.1757-.837.1757-1.2803%200-2.6025-2.125-4.727-4.7344-4.727%22%2F%3E%3C%2Fsvg%3E" type="image/svg+xml">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
+        body { font-family: 'Inter', system-ui, sans-serif; background: #fff; color: #000; overflow: hidden; }
+        
+        .sidebar { width: 240px; border-right: 1px solid #e0e0e0; background: #f9f9f9; height: 100vh; flex-shrink: 0; display: flex; flex-direction: column; }
+        .sidebar-scroll { flex: 1; overflow-y: auto; padding-top: 8px; }
+        .nav-item { display: flex; align-items: center; padding: 7px 16px; font-size: 13.5px; color: #404040; cursor: pointer; transition: 0.1s; }
+        .nav-item:hover { background: #eee; }
+        .nav-item.active { background: #e2ebf6; color: #0051c3; font-weight: 600; border-right: 3px solid #0051c3; }
+        .nav-item svg { width: 18px; height: 18px; min-width: 18px; margin-right: 12px; stroke-width: 1.5; }
+        .sidebar-header { padding: 12px 16px; border-bottom: 1px solid #e0e0e0; display: flex; align-items: center; justify-content: space-between; font-size: 12px; background: #fff; }
+        .group-label { font-size: 11px; font-weight: 700; color: #888; text-transform: uppercase; padding: 16px 16px 6px; letter-spacing: 0.5px; }
+        
+        #user-dropdown { display: none; position: absolute; top: 44px; right: 10px; width: 200px; background: white; border: 1px solid #ddd; border-radius: 4px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); z-index: 100; }
+        .dropdown-item { padding: 10px 16px; font-size: 13px; color: #333; cursor: pointer; display: flex; align-items: center; }
+        .dropdown-item:hover { background: #f5f5f5; }
+        .dropdown-item.danger { color: #d0021b; border-top: 1px solid #f0f0f0; }
+
+        .cf-table { width: 100%; border-collapse: collapse; }
+        .cf-table th { text-align: left; padding: 12px 8px; font-size: 12px; color: #666; font-weight: 500; border-bottom: 1px solid #e0e0e0; }
+        .cf-table td { padding: 12px 8px; border-bottom: 1px solid #f0f0f0; font-size: 14px; vertical-align: middle; }
+        
+        .badge-proxy { background: #f6821f; color: white; font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 12px; text-transform: uppercase; }
+        .badge-dns { background: #e8e8e8; color: #444; font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 12px; }
+        .badge-worker { background: #2c7cb0; color: white; font-size: 10px; padding: 2px 8px; border-radius: 12px; }
+
+        /* 登录页样式 */
+        .login-container { max-width: 400px; margin: 0 auto; padding: 0 20px; }
+        .login-header { display: flex; justify-content: space-between; align-items: center; padding: 16px 24px; }
+        
+        /* 按钮状态样式 */
+        .login-submit-btn { 
+            width: 100%; padding: 12px; 
+            background-color: #cce0ff; /* 默认灰色/浅蓝 */
+            color: #fff; 
+            border: none; border-radius: 4px; 
+            font-size: 15px; font-weight: 600; 
+            cursor: not-allowed; 
+            margin-bottom: 24px; 
+            transition: all 0.2s; 
+        }
+        /* 激活状态 */
+        .login-submit-btn.active-state { 
+            background-color: #0051c3; /* 亮蓝色 */
+            cursor: pointer; 
+        }
+
+        /* 模态框 */
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); align-items: center; justify-content: center; z-index: 200; }
+        .modal.active { display: flex; }
+        .modal-content { background: white; border-radius: 8px; width: 500px; max-width: 90%; padding: 24px; box-shadow: 0 20px 60px rgba(0,0,0,0.3); }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .modal-header h3 { font-size: 18px; font-weight: 600; }
+        .close-modal { cursor: pointer; font-size: 24px; line-height: 1; color: #888; }
+        
+        /* 视图切换 */
+        #login-view, #console-view { height: 100vh; display: flex; flex-direction: column; }
+        #console-view.hidden-default { display: none; }
+        
+        /* 通用组件 */
+        .btn-primary { background: #0051c3; color: white; padding: 6px 12px; border-radius: 4px; font-size: 13px; border: none; cursor: pointer; }
+        .btn-primary:hover { background: #0041a3; }
+        .btn-secondary { background: white; color: #333; border: 1px solid #d9d9d9; padding: 6px 12px; border-radius: 4px; font-size: 13px; cursor: pointer; }
+        .input-field { width: 100%; padding: 8px 12px; border: 1px solid #d9d9d9; border-radius: 4px; font-size: 14px; box-sizing: border-box; }
+        .input-field:focus { border-color: #0051c3; outline: none; }
+    </style>
+</head>
+<body>
+    <!-- 登录视图 -->
+    <div id="login-view">
+        <header class="login-header">
+            <!-- 左上角图标 -->
+            <div style="color:#f38020; width:32px; height:32px;">
+                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M16.5088 16.8447c.1475-.5068.0908-.9707-.1553-1.3154-.2246-.3164-.6045-.499-1.0615-.5205l-8.6592-.1123a.1559.1559 0 0 1-.1333-.0713c-.0283-.042-.0351-.0986-.021-.1553.0278-.084.1123-.1484.2036-.1562l8.7359-.1123c1.0351-.0489 2.1601-.8868 2.5537-1.9136l.499-1.3013c.0215-.0561.0293-.1128.0147-.168-.5625-2.5463-2.835-4.4453-5.5499-4.4453-2.5039 0-4.6284 1.6177-5.3876 3.8614-.4927-.3658-1.1187-.5625-1.794-.499-1.2026.119-2.1665 1.083-2.2861 2.2856-.0283.31-.0069.6128.0635.894C1.5683 13.171 0 14.7754 0 16.752c0 .1748.0142.3515.0352.5273.0141.083.0844.1475.1689.1475h15.9814c.0909 0 .1758-.0645.2032-.1553l.12-.4268zm2.7568-5.5634c-.0771 0-.1611 0-.2383.0112-.0566 0-.1054.0415-.127.0976l-.3378 1.1744c-.1475.5068-.0918.9707.1543 1.3164.2256.3164.6055.498 1.0625.5195l1.8437.1133c.0557 0 .1055.0263.1329.0703.0283.043.0351.1074.0214.1562-.0283.084-.1132.1485-.204.1553l-1.921.1123c-1.041.0488-2.1582.8867-2.5527 1.914l-.1406.3585c-.0283.0713.0215.1416.0986.1416h6.5977c.0771 0 .1474-.0489.169-.126.1122-.4082.1757-.837.1757-1.2803 0-2.6025-2.125-4.727-4.7344-4.727"/></svg>
+            </div>
+            <a href="https://dash.cloudflare.com/sign-up" class="btn-secondary">注册</a>
+        </header>
+        <div class="flex-1 flex items-center justify-center">
+            <main class="login-container">
+                <h1 class="text-2xl font-bold text-center mb-8">登录到 Cloudflare</h1>
+                <form id="loginForm" onsubmit="return false;">
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium mb-1">API 令牌</label>
+                        <!-- 输入框 ID: apiToken -->
+                        <input type="password" id="apiToken" class="input-field" placeholder="请输入 API Token" autocomplete="off">
+                    </div>
+                    <!-- 按钮 ID: loginBtn, 默认禁用 -->
+                    <button type="button" id="loginBtn" class="login-submit-btn" disabled>登录</button>
+                </form>
+            </main>
+        </div>
+    </div>
+
+    <!-- 控制台视图 -->
+    <div id="console-view" class="hidden-default">
+        <header class="h-12 border-b flex items-center justify-between px-4 bg-white">
+            <div class="flex items-center">
+                <div class="text-[#f38020] w-8 h-8 mr-4"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M16.5088 16.8447c.1475-.5068.0908-.9707-.1553-1.3154-.2246-.3164-.6045-.499-1.0615-.5205l-8.6592-.1123a.1559.1559 0 0 1-.1333-.0713c-.0283-.042-.0351-.0986-.021-.1553.0278-.084.1123-.1484.2036-.1562l8.7359-.1123c1.0351-.0489 2.1601-.8868 2.5537-1.9136l.499-1.3013c.0215-.0561.0293-.1128.0147-.168-.5625-2.5463-2.835-4.4453-5.5499-4.4453-2.5039 0-4.6284 1.6177-5.3876 3.8614-.4927-.3658-1.1187-.5625-1.794-.499-1.2026.119-2.1665 1.083-2.2861 2.2856-.0283.31-.0069.6128.0635.894C1.5683 13.171 0 14.7754 0 16.752c0 .1748.0142.3515.0352.5273.0141.083.0844.1475.1689.1475h15.9814c.0909 0 .1758-.0645.2032-.1553l.12-.4268zm2.7568-5.5634c-.0771 0-.1611 0-.2383.0112-.0566 0-.1054.0415-.127.0976l-.3378 1.1744c-.1475.5068-.0918.9707.1543 1.3164.2256.3164.6055.498 1.0625.5195l1.8437.1133c.0557 0 .1055.0263.1329.0703.0283.043.0351.1074.0214.1562-.0283.084-.1132.1485-.204.1553l-1.921.1123c-1.041.0488-2.1582.8867-2.5527 1.914l-.1406.3585c-.0283.0713.0215.1416.0986.1416h6.5977c.0771 0 .1474-.0489.169-.126.1122-.4082.1757-.837.1757-1.2803 0-2.6025-2.125-4.727-4.7344-4.727"/></svg></div>
+                <span id="header-token-mask" class="text-gray-500 text-xs"></span>
+            </div>
+            <div class="relative">
+                <div id="user-btn" class="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center cursor-pointer border hover:border-gray-300">
+                    <svg class="w-5 h-5 text-gray-500" fill="currentColor" viewBox="0 0 20 20"><path d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z"/></svg>
+                </div>
+                <div id="user-dropdown">
+                    <div class="px-4 py-3 border-b"><p class="text-xs text-gray-400">当前 Token</p><p id="menu-token-id" class="text-sm truncate"></p></div>
+                    <div id="logout-btn" class="dropdown-item danger">退出登录</div>
+                </div>
+            </div>
+        </header>
+
+        <div class="flex flex-1 overflow-hidden">
+            <aside class="sidebar">
+                <div class="sidebar-header"><span class="font-medium">控制台</span></div>
+                <div class="sidebar-scroll">
+                    <div class="nav-item active" id="nav-home"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" stroke-width="1.8"/></svg>主页</div>
+                    <div class="group-label">产品</div>
+                    <div class="nav-item" id="nav-workers"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M13 10V3L4 14h7v7l9-11h-7z" stroke-width="1.8"/></svg>Workers</div>
+                    <div class="nav-item" id="nav-dns"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01" stroke-width="1.8"/></svg>DNS</div>
+                </div>
+            </aside>
+
+            <main class="flex-1 overflow-y-auto p-8 bg-white">
+                <div id="home-view">
+                    <div class="flex justify-between items-center mb-6"><h1 class="text-2xl font-bold">站点列表</h1></div>
+                    <table class="cf-table"><thead><tr><th>域</th><th>状态</th><th>计划</th></tr></thead><tbody id="domain-list"></tbody></table>
+                </div>
+                <div id="workers-view" style="display: none;"><h1 class="text-2xl font-bold mb-6">Workers 脚本</h1><div id="workers-list" class="space-y-2"></div></div>
+                <div id="dns-view" style="display: none;">
+                    <div class="flex justify-between items-center mb-6">
+                        <h1 class="text-2xl font-bold">DNS 记录</h1>
+                        <div class="flex gap-2">
+                            <select id="zone-selector" class="input-field w-48"><option value="">选择域...</option></select>
+                            <button id="add-dns-btn" class="btn-primary">添加记录</button>
+                        </div>
+                    </div>
+                    <table class="cf-table"><thead><tr><th>类型</th><th>名称</th><th>内容</th><th>代理状态</th><th>操作</th></tr></thead><tbody id="dns-list"></tbody></table>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <!-- DNS 编辑模态框 -->
+    <div id="dns-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header"><h3 id="modal-title">编辑记录</h3><span class="close-modal">&times;</span></div>
+            <form id="dns-form">
+                <input type="hidden" id="dns-record-id">
+                <div class="mb-4"><label class="block text-sm mb-1">类型</label><select id="dns-type" class="input-field"><option>A</option><option>AAAA</option><option>CNAME</option><option>TXT</option><option>MX</option></select></div>
+                <div class="mb-4"><label class="block text-sm mb-1">名称</label><input type="text" id="dns-name" class="input-field" placeholder="@"></div>
+                <div class="mb-4"><label class="block text-sm mb-1">内容</label><input type="text" id="dns-content" class="input-field"></div>
+                <div class="mb-4 flex items-center gap-2"><input type="checkbox" id="dns-proxied" class="w-4 h-4"><label for="dns-proxied" class="text-sm">已代理</label></div>
+                <div class="text-right"><button type="button" class="btn-secondary mr-2 close-modal">取消</button><button type="submit" class="btn-primary">保存</button></div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // ==========================================
+        // 核心 JavaScript 逻辑 (修复作用域与初始化问题)
+        // ==========================================
+        
+        // 全局变量定义
+        let token = localStorage.getItem('cf_token');
+        let currentZoneId = null;
+
+        // DOM 元素引用 (页面加载后获取)
+        let viewLogin, viewConsole, inputToken, btnLogin;
+        let navHome, navWorkers, navDns;
+        let viewHome, viewWorkers, viewDns;
+        let userBtn, userMenu, logoutBtn;
+
+        // 页面加载完成后初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            // 1. 获取 DOM 元素
+            viewLogin = document.getElementById('login-view');
+            viewConsole = document.getElementById('console-view');
+            inputToken = document.getElementById('apiToken');
+            btnLogin = document.getElementById('loginBtn');
+            
+            navHome = document.getElementById('nav-home');
+            navWorkers = document.getElementById('nav-workers');
+            navDns = document.getElementById('nav-dns');
+            
+            viewHome = document.getElementById('home-view');
+            viewWorkers = document.getElementById('workers-view');
+            viewDns = document.getElementById('dns-view');
+            
+            userBtn = document.getElementById('user-btn');
+            userMenu = document.getElementById('user-dropdown');
+            logoutBtn = document.getElementById('logout-btn');
+
+            // 2. 绑定登录事件
+            // 核心修复：确保事件绑定在元素获取之后
+            bindLoginEvents();
+
+            // 3. 视图控制逻辑
+            if (token && token.length > 10) {
+                showConsoleView();
+            } else {
+                showLoginView();
+            }
+        });
+
+        // ================= 登录逻辑 =================
+        function bindLoginEvents() {
+            // 检查按钮状态
+            function checkInput() {
+                const val = inputToken.value.trim();
+                if (val.length > 10) {
+                    btnLogin.disabled = false; // 移除禁用属性
+                    btnLogin.classList.add('active-state'); // 添加激活样式
+                } else {
+                    btnLogin.disabled = true;
+                    btnLogin.classList.remove('active-state');
+                }
+            }
+
+            // 监听输入 (多种事件确保捕获)
+            inputToken.addEventListener('input', checkInput);
+            inputToken.addEventListener('keyup', checkInput);
+            inputToken.addEventListener('paste', checkInput);
+
+            // 点击登录
+            btnLogin.addEventListener('click', function() {
+                const val = inputToken.value.trim();
+                if (val.length < 10) {
+                    alert('Token 过短');
+                    return;
+                }
+                localStorage.setItem('cf_token', val);
+                token = val;
+                showConsoleView();
+            });
+
+            // 初始检查一次 (防止浏览器自动填充)
+            setTimeout(checkInput, 100);
+        }
+
+        function showLoginView() {
+            viewLogin.style.display = 'flex';
+            viewConsole.style.display = 'none';
+        }
+
+        function showConsoleView() {
+            viewLogin.style.display = 'none';
+            viewConsole.style.display = 'flex';
+            initConsole();
+        }
+
+        // ================= 控制台逻辑 =================
+        function initConsole() {
+            const masked = token.substring(0,6) + '...' + token.substring(token.length-4);
+            document.getElementById('header-token-mask').innerText = masked;
+            document.getElementById('menu-token-id').innerText = token;
+
+            // 导航点击
+            navHome.onclick = () => switchView('home');
+            navWorkers.onclick = () => switchView('workers');
+            navDns.onclick = () => switchView('dns');
+
+            // 用户菜单
+            userBtn.onclick = (e) => {
+                e.stopPropagation();
+                userMenu.style.display = userMenu.style.display === 'block' ? 'none' : 'block';
+            };
+            window.onclick = () => userMenu.style.display = 'none';
+            logoutBtn.onclick = () => { localStorage.clear(); location.reload(); };
+
+            // DNS 相关
+            document.getElementById('add-dns-btn').onclick = () => openDnsModal();
+            document.getElementById('dns-form').onsubmit = (e) => { e.preventDefault(); saveDnsRecord(); };
+            document.getElementById('dns-modal').onclick = (e) => { 
+                if(e.target.classList.contains('close-modal') || e.target.id === 'dns-modal') 
+                    document.getElementById('dns-modal').classList.remove('active'); 
+            };
+            document.getElementById('zone-selector').onchange = (e) => { currentZoneId = e.target.value; loadDnsRecords(); };
+
+            loadZones();
+        }
+
+        function switchView(view) {
+            navHome.classList.remove('active');
+            navWorkers.classList.remove('active');
+            navDns.classList.remove('active');
+            viewHome.style.display = 'none';
+            viewWorkers.style.display = 'none';
+            viewDns.style.display = 'none';
+
+            if (view === 'home') { viewHome.style.display = 'block'; navHome.classList.add('active'); loadZones(); }
+            if (view === 'workers') { viewWorkers.style.display = 'block'; navWorkers.classList.add('active'); loadWorkers(); }
+            if (view === 'dns') { viewDns.style.display = 'block'; navDns.classList.add('active'); populateDnsSelector(); }
+        }
+
+        // API 请求封装
+        async function api(path, method='GET', body=null) {
+            const opts = { method, headers: { 'Authorization': 'Bearer '+token } };
+            if (body) { opts.body = JSON.stringify(body); opts.headers['Content-Type'] = 'application/json'; }
+            const res = await fetch('/api' + path, opts);
+            return res.json();
+        }
+
+        // 加载 Zones
+        async function loadZones() {
+            const list = document.getElementById('domain-list');
+            list.innerHTML = '<tr><td colspan="3" class="p-4 text-gray-400">加载中...</td></tr>';
+            const data = await api('/zones');
+            if(!data.success) return list.innerHTML = '<tr><td colspan="3" class="p-4 text-red-500">错误: '+data.errors[0].message+'</td></tr>';
+            list.innerHTML = data.result.map(z => '<tr><td class="text-blue-600 font-semibold">'+z.name+'</td><td class="text-green-600">'+z.status+'</td><td>'+(z.plan?.name||'Free')+'</td></tr>').join('');
+        }
+
+        // 加载 Workers
+        async function loadWorkers() {
+            const el = document.getElementById('workers-list');
+            el.innerHTML = '<p class="text-gray-400">加载中...</p>';
+            const accData = await api('/accounts');
+            if(!accData.success || !accData.result.length) return el.innerHTML = '<p class="text-red-500">无法获取账户，请检查 Token 权限</p>';
+            const scripts = await api('/accounts/'+accData.result[0].id+'/workers/scripts');
+            if(!scripts.success) return el.innerHTML = '<p class="text-red-500">加载失败</p>';
+            el.innerHTML = scripts.result.map(w => '<div class="p-3 border rounded bg-gray-50 flex justify-between"><span class="font-medium">'+w.id+'</span><span class="badge-worker">Active</span></div>').join('');
+        }
+
+        // DNS 选择器填充
+        async function populateDnsSelector() {
+            const data = await api('/zones');
+            if(data.success) {
+                document.getElementById('zone-selector').innerHTML = '<option value="">选择域...</option>' + data.result.map(z => '<option value="'+z.id+'">'+z.name+'</option>').join('');
+            }
+        }
+
+        // 加载 DNS 记录
+        async function loadDnsRecords() {
+            if(!currentZoneId) return;
+            const list = document.getElementById('dns-list');
+            list.innerHTML = '<tr><td colspan="5" class="p-4 text-gray-400">加载中...</td></tr>';
+            const data = await api('/zones/'+currentZoneId+'/dns_records');
+            if(!data.success) return list.innerHTML = '<tr><td colspan="5" class="p-4 text-red-500">错误</td></tr>';
+            list.innerHTML = data.result.map(r => 
+                '<tr><td><span class="bg-gray-100 px-2 py-1 rounded text-xs font-mono">'+r.type+'</span></td><td>'+r.name+'</td><td class="truncate max-w-xs">'+r.content+'</td><td>'+(r.proxied?'<span class="badge-proxy">已代理</span>':'<span class="badge-dns">仅DNS</span>')+'</td><td><button class="text-blue-600 mr-2" onclick="editDns(\''+r.id+'\',\''+r.type+'\',\''+r.name+'\',\''+r.content+'\','+r.proxied+')">编辑</button><button class="text-red-600" onclick="deleteDns(\''+r.id+'\')">删除</button></td></tr>'
+            ).join('');
+        }
+
+        // DNS 操作函数
+        window.editDns = (id, type, name, content, proxied) => openDnsModal({id, type, name, content, proxied});
+        window.deleteDns = async (id) => { if(confirm('确定删除?')) { await api('/zones/'+currentZoneId+'/dns_records/'+id, 'DELETE'); loadDnsRecords(); } };
+        
+        function openDnsModal(data={}) {
+            document.getElementById('modal-title').innerText = data.id ? '编辑记录' : '添加记录';
+            document.getElementById('dns-record-id').value = data.id || '';
+            document.getElementById('dns-type').value = data.type || 'A';
+            document.getElementById('dns-name').value = data.name || '';
+            document.getElementById('dns-content').value = data.content || '';
+            document.getElementById('dns-proxied').checked = data.proxied || false;
+            document.getElementById('dns-modal').classList.add('active');
+        }
+
+        async function saveDnsRecord() {
+            const id = document.getElementById('dns-record-id').value;
+            const body = {
+                type: document.getElementById('dns-type').value,
+                name: document.getElementById('dns-name').value,
+                content: document.getElementById('dns-content').value,
+                proxied: document.getElementById('dns-proxied').checked,
+                ttl: 1
+            };
+            const url = '/zones/'+currentZoneId+'/dns_records' + (id ? '/'+id : '');
+            const method = id ? 'PUT' : 'POST';
+            const res = await api(url, method, body);
+            if(res.success) { document.getElementById('dns-modal').classList.remove('active'); loadDnsRecords(); }
+            else alert('保存失败: ' + res.errors[0].message);
+        }
+    </script>
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js/v8c78df7c7c0f484497ecbca7046644da1771523124516" integrity="sha512-8DS7rgIrAmghBFwoOTujcf6D9rXvH8xm8JQ1Ja01h9QX8EzXldiszufYa4IFfKdLUKTTrnSFXLDkUEOTrZQ8Qg==" data-cf-beacon='{"version":"2024.11.0","token":"4526b8512fab47adbd5adb1e3dec6e01","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
+</body>
+</html>
